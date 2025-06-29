@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState } from "react";
+import { useZerodhaAuth } from "./useZerodhaAuthProvider";
+import { mcpPlaceOrder } from "./mcpClient";
 
 /**
- * ZerodhaProvider: API integration for order placement.
- *
- * To wire up to real Zerodha MCP REST endpoints, add logic/API calls inside placeOrder().
+ * ZerodhaProvider: API integration for order placement. LIVE via MCP server!
  */
 const ZerodhaContext = createContext();
 
@@ -16,25 +16,31 @@ const ZerodhaProvider = ({ children }) => {
   const [orderStatus, setOrderStatus] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState(null);
+  const { token, isAuthenticated } = useZerodhaAuth();
 
   // PUBLIC_INTERFACE
-  function placeOrder(order) {
+  async function placeOrder(order) {
     setOrderLoading(true);
     setOrderStatus(null);
     setOrderError(null);
 
-    // Simulate a fake order & response
-    setTimeout(() => {
-      if (!order.symbol || !order.price || !order.strike) {
-        setOrderError("Invalid order details");
-        setOrderLoading(false);
-        return;
-      }
-      setOrderStatus(
-        `${order.direction} ${order.qty} ${order.symbol} ${order.option_type} @ ₹${order.price} (strike ${order.strike})`
-      );
+    if (!isAuthenticated || !token) {
+      setOrderError("Not authenticated. Please login.");
       setOrderLoading(false);
-    }, 850);
+      return;
+    }
+    try {
+      const placed = await mcpPlaceOrder(token, order);
+      setOrderStatus(
+        placed.status
+          ? `${placed.status}: ${placed.order_id || ""}`
+          : "Order submitted"
+      );
+    } catch (e) {
+      setOrderError(e.message || "Failed to place order.");
+    } finally {
+      setOrderLoading(false);
+    }
   }
 
   const contextValue = {

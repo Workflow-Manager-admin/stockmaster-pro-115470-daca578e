@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useZerodhaAuth } from "./useZerodhaAuthProvider";
+import { mcpGetPortfolio, mcpGetRecommendations } from "./mcpClient";
 
 /**
- * PortfolioProvider - handles fetching and updating user's portfolio and recs.
+ * PortfolioProvider - handles fetching and updating user's portfolio and recs via live MCP.
  */
 const PortfolioContext = createContext();
 
@@ -10,21 +12,6 @@ export function usePortfolio() {
   return useContext(PortfolioContext);
 }
 
-/**
- * Demo data until hooked up with backend/db.
- */
-const DEMO_HOLDINGS = [
-  { ticker: "INFY", quantity: 10, avg_price: 1410, last_price: 1481 },
-  { ticker: "TCS", quantity: 5, avg_price: 3320, last_price: 3355 },
-  { ticker: "HDFCBANK", quantity: 12, avg_price: 1575, last_price: 1599.5 },
-  { ticker: "RELIANCE", quantity: 6, avg_price: 2720, last_price: 2698 },
-];
-const DEMO_RECOMMENDATIONS = [
-  { ticker: "ITC", type: "BUY", description: "Strong breakout above 430 zone" },
-  { ticker: "ICICIBANK", type: "WATCH", description: "Earnings due, high volatility expected" },
-  { ticker: "RELIANCE", type: "SELL", description: "Near resistance, consider booking profits" },
-];
-
 const PortfolioProvider = ({ children }) => {
   const [holdings, setHoldings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,17 +19,60 @@ const PortfolioProvider = ({ children }) => {
   const [recommendations, setRecommendations] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulated load for demo
-    setTimeout(() => {
-      setHoldings(DEMO_HOLDINGS);
+  const { token, isAuthenticated } = useZerodhaAuth();
+
+  // fetch portfolio (holdings)
+  const fetchHoldings = useCallback(async () => {
+    if (!isAuthenticated || !token) {
+      setHoldings([]);
       setIsLoading(false);
-    }, 400);
-    setTimeout(() => {
-      setRecommendations(DEMO_RECOMMENDATIONS);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const data = await mcpGetPortfolio(token);
+      // Adapts raw data to {ticker, quantity, avg_price, last_price}
+      const mapped = (Array.isArray(data?.holdings) ? data.holdings : data).map((item) => ({
+        ticker: item.symbol || item.ticker,
+        quantity: item.quantity,
+        avg_price: item.average_price || item.avg_price || 0,
+        last_price: item.last_price,
+      })) || [];
+      setHoldings(mapped);
+    } catch (_) {
+      setHoldings([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, isAuthenticated]);
+
+  // fetch recommendations
+  const fetchRecommendations = useCallback(async () => {
+    if (!isAuthenticated || !token) {
+      setRecommendations([]);
       setRecommendationsLoading(false);
-    }, 700);
-  }, []);
+      return;
+    }
+    setRecommendationsLoading(true);
+    try {
+      const data = await mcpGetRecommendations(token);
+      setRecommendations(
+        Array.isArray(data?.recommendations) ? data.recommendations : (data || [])
+      );
+    } catch (_) {
+      setRecommendations([]);
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  }, [token, isAuthenticated]);
+
+  // Fetch on auth/token change
+  useEffect(() => {
+    fetchHoldings();
+    fetchRecommendations();
+    // We rely on the above being memoized
+    // eslint-disable-next-line
+  }, [token, isAuthenticated]);
 
   // PUBLIC_INTERFACE
   const contextValue = {
@@ -50,7 +80,9 @@ const PortfolioProvider = ({ children }) => {
     isLoading,
     recommendations,
     recommendationsLoading,
-    // API expansion: fetchHoldings, refresh, etc.
+    // Live fetch methods for manual refresh
+    fetchHoldings,
+    fetchRecommendations,
   };
   return (
     <PortfolioContext.Provider value={contextValue}>
