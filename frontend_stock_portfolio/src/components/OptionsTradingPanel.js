@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useZerodha } from "../hooks/useZerodhaProvider";
+import { useZerodhaAuth } from "../hooks/useZerodhaAuthProvider";
 
 /**
  * OptionsTradingPanel - Simple UI for trading stock options with Zerodha MCP integration.
@@ -15,6 +16,8 @@ function OptionsTradingPanel() {
     price: "",
   });
 
+  const { isAuthenticated } = useZerodhaAuth();
+
   // PUBLIC_INTERFACE
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,6 +32,24 @@ function OptionsTradingPanel() {
   return (
     <div className="panel options-trading-panel" id="options">
       <h3>Options Trading (Zerodha MCP Demo)</h3>
+      {!isAuthenticated && (
+        <div
+          style={{
+            background: "#fff4e9",
+            color: "#e65100",
+            margin: "5px 0 10px 0",
+            padding: "8px 15px",
+            borderRadius: 7,
+            fontSize: "0.98em",
+            fontWeight: 500,
+          }}
+        >
+          <span role="img" aria-label="warning" style={{ marginRight: 4 }}>
+            ⚠️
+          </span>
+          Login with Zerodha to place live trades.
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="options-form">
         <input type="text" name="symbol" placeholder="Symbol (e.g. INFY)" value={form.symbol} onChange={handleChange} required />
         <input type="number" name="strike" placeholder="Strike Price" value={form.strike} min="1" onChange={handleChange} required />
@@ -42,7 +63,7 @@ function OptionsTradingPanel() {
           <option value="BUY">BUY</option>
           <option value="SELL">SELL</option>
         </select>
-        <button className="btn" type="submit" disabled={orderLoading}>Place Order</button>
+        <button className="btn" type="submit" disabled={orderLoading || !isAuthenticated}>Place Order</button>
       </form>
       {orderStatus && <div className="order-success">Order placed: {orderStatus}</div>}
       {orderError && <div className="order-error">Error: {orderError}</div>}

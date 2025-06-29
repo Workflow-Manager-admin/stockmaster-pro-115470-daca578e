@@ -4,6 +4,7 @@ import "./index.css";
 import DashboardLayout from "./components/DashboardLayout";
 import PortfolioProvider from "./hooks/usePortfolioProvider";
 import ZerodhaProvider from "./hooks/useZerodhaProvider";
+import ZerodhaAuthProvider from "./hooks/useZerodhaAuthProvider"; // NEW FOR AUTH
 
 // PUBLIC_INTERFACE
 function App() {
@@ -23,11 +24,13 @@ function App() {
 
   return (
     <div className={`App`} data-theme={theme}>
-      <ZerodhaProvider>
-        <PortfolioProvider>
-          <DashboardLayout theme={theme} onThemeToggle={handleThemeToggle} />
-        </PortfolioProvider>
-      </ZerodhaProvider>
+      <ZerodhaAuthProvider>
+        <ZerodhaProvider>
+          <PortfolioProvider>
+            <DashboardLayout theme={theme} onThemeToggle={handleThemeToggle} />
+          </PortfolioProvider>
+        </ZerodhaProvider>
+      </ZerodhaAuthProvider>
     </div>
   );
 }
